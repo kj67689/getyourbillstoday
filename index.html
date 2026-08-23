@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PropBills | Entertainment Props</title>
+<script src="https://web.squarecdn.com/v1/square.js"></script>
+<style>
+body{font-family:Arial,sans-serif;background:#f5f6f8;color:#161616;margin:0}*{box-sizing:border-box}
+.notice{background:#b00020;color:#fff;text-align:center;padding:12px;font-weight:bold}.wrap{max-width:760px;margin:0 auto;padding:28px 16px}
+h1{text-align:center}.card{background:#fff;padding:24px;border-radius:14px;box-shadow:0 4px 18px #0001;margin:18px 0}
+label{display:block;font-weight:bold;margin-top:14px;margin-bottom:6px}input,select{width:100%;padding:12px;border:1px solid #ccc;border-radius:8px;font-size:16px}
+button{padding:13px 16px;border:0;border-radius:8px;background:#111827;color:white;font-size:16px;cursor:pointer;width:100%;margin-top:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}.pay{border:2px solid #ddd;padding:14px;border-radius:10px;cursor:pointer;text-align:center}.pay.selected{border-color:#198754;background:#f0fff5}
+#mixedBox{display:none}.status{margin-top:10px;font-weight:bold}.ok{color:#198754}.bad{color:#b00020}.payment-area{display:none;margin-top:18px;padding:16px;border:1px solid #ddd;border-radius:10px}
+.small{font-size:13px;color:#555}.summary{background:#f3f4f6;padding:16px;border-radius:10px;margin-top:18px;line-height:1.8}
+</style>
+</head>
+<body>
+<div class="notice">⚠️ PROP / COPY MONEY ONLY — NOT LEGAL TENDER — FOR ENTERTAINMENT PURPOSES ONLY ⚠️</div>
+<div class="wrap">
+<h1>💵 PropBills Checkout</h1>
+
+<div class="card">
+<label>Package</label>
+<select id="package">
+<option value="350">350 Bills — $20</option>
+<option value="600">600 Bills — $35</option>
+<option value="750">750 Bills — $50</option>
+<option value="1000">1,000 Bills — $85</option>
+<option value="1500">1.5K Bills — $100</option>
+</select>
+
+<label>Bill denomination</label>
+<select id="denomination">
+<option value="">Choose a denomination</option>
+<option>$1 Prop Bills</option><option>$5 Prop Bills</option><option>$10 Prop Bills</option>
+<option>$20 Prop Bills</option><option>$50 Prop Bills</option><option>$100 Prop Bills</option>
+<option value="mixed">Mixed denominations</option>
+</select>
+
+<div id="mixedBox">
+<h3>Choose quantities</h3>
+<div class="grid">
+<div><label>$1</label><input class="mix" data-denom="$1" type="number" min="0" value="0"></div>
+<div><label>$5</label><input class="mix" data-denom="$5" type="number" min="0" value="0"></div>
+<div><label>$10</label><input class="mix" data-denom="$10" type="number" min="0" value="0"></div>
+<div><label>$20</label><input class="mix" data-denom="$20" type="number" min="0" value="0"></div>
+<div><label>$50</label><input class="mix" data-denom="$50" type="number" min="0" value="0"></div>
+<div><label>$100</label><input class="mix" data-denom="$100" type="number" min="0" value="0"></div>
+</div>
+<div id="mixStatus" class="status bad"></div>
+</div>
+
+<label>Full name</label><input id="name" autocomplete="name">
+<label>Street address</label><input id="address1" autocomplete="address-line1">
+<label>Apartment / suite (optional)</label><input id="address2" autocomplete="address-line2">
+<label>City</label><input id="city" autocomplete="address-level2">
+<label>State</label><input id="state" autocomplete="address-level1">
+<label>ZIP code</label><input id="zip" autocomplete="postal-code">
+<label>Phone number</label><input id="phone" type="tel" autocomplete="tel">
+
+<label>Promo code</label><input id="promo" placeholder="PROP10, FUN10, or STACK10">
+<button id="applyPromo">Apply Promo</button>
+<div id="promoMessage" class="small"></div>
+
+<div class="summary">
+<strong>Order total:</strong> $<span id="total">20.00</span><br>
+<span id="summaryBills">350 bills</span>
+</div>
+</div>
+
+<div class="card">
+<h2>Payment</h2>
+<div class="grid">
+<div class="pay" data-method="paypal">🅿️ PayPal</div>
+<div class="pay" data-method="cashapp">💵 Cash App Pay</div>
+<div class="pay" data-method="applepay">🍎 Apple Pay</div>
+</div>
+
+<div id="paypalArea" class="payment-area"><div id="paypal-button-container"></div></div>
+<div id="cashappArea" class="payment-area"><div id="cash-app-pay"></div></div>
+<div id="applepayArea" class="payment-area"><button id="applePayButton">🍎 Pay with Apple Pay</button></div>
+
+<p class="small">Payment methods only process after official provider setup and merchant eligibility are active.</p>
+</div>
+
+<div class="card">
+<strong>⚠️ Notice</strong>
+<p>These products are prop/copy money only, are not real currency, are not legal tender, and are for entertainment and novelty purposes only.</p>
+</div>
+</div>
+
+<script>
+const SQUARE_APP_ID = "sq0idp-YtzsPCv1sJ8T43s4k7Wz9g";
+const SQUARE_LOCATION_ID = "LAVKZDTN3AQSY";
+const PAYPAL_CLIENT_ID = "REPLACE_WITH_YOUR_PAYPAL_CLIENT_ID";
+
+const prices={350:20,600:35,750:50,1000:85,1500:100};
+let discount=0, selectedMethod="", payments, applePay;
+
+function orderData(){
+ const pkg=Number(document.querySelector("#package").value);
+ const denom=document.querySelector("#denomination").value;
+ const mixed={};
+ document.querySelectorAll(".mix").forEach(x=>mixed[x.dataset.denom]=Number(x.value)||0);
+ return {package:pkg,denomination:denom,mixed,name:name.value.trim(),address1:address1.value.trim(),address2:address2.value.trim(),city:city.value.trim(),state:state.value.trim(),zip:zip.value.trim(),phone:phone.value.trim(),promo:promo.value.trim().toUpperCase()};
+}
+function validateOrder(){
+ const d=orderData();
+ if(!d.denomination) return alert("Choose a denomination."),false;
+ if(!d.name||!d.address1||!d.city||!d.state||!d.zip||!d.phone) return alert("Please complete your name, address, and phone number."),false;
+ if(d.denomination==="mixed"){
+   const total=Object.values(d.mixed).reduce((a,b)=>a+b,0);
+   if(total!==d.package) return alert(`Mixed denominations must equal exactly ${d.package} bills.`),false;
+ }
+ return true;
+}
+function updateTotal(){
+ const pkg=Number(package.value), total=prices[pkg]*(1-discount);
+ document.querySelector("#total").textContent=total.toFixed(2);
+ document.querySelector("#summaryBills").textContent=`${pkg.toLocaleString()} bills`;
+ updateMix();
+}
+function updateMix(){
+ const required=Number(package.value);
+ const total=[...document.querySelectorAll(".mix")].reduce((a,x)=>a+(Number(x.value)||0),0);
+ const s=document.querySelector("#mixStatus");
+ s.textContent=`Selected: ${total} / ${required} bills`;
+ s.className="status "+(total===required?"ok":"bad");
+}
+package.onchange=updateTotal;
+denomination.onchange=()=>mixedBox.style.display=denomination.value==="mixed"?"block":"none";
+document.querySelectorAll(".mix").forEach(x=>x.oninput=updateMix);
+applyPromo.onclick=()=>{
+ const c=promo.value.trim().toUpperCase();
+ discount=["PROP10","FUN10","STACK10"].includes(c)?0.10:0;
+ promoMessage.textContent=discount?"Promo applied: 10% off.":"Invalid promo code.";
+ updateTotal();
+};
+
+async function initSquare(){
+ if(!window.Square) return;
+ payments=window.Square.payments(SQUARE_APP_ID,SQUARE_LOCATION_ID);
+
+ try {
+   const cashAppPay=await payments.cashAppPay({redirectURL:window.location.href,referenceId:"PROP-"+Date.now()});
+   await cashAppPay.attach("#cash-app-pay");
+   cashAppPay.addEventListener("ontokenization",async e=>{
+     if(!validateOrder()) return;
+     if(e.detail.status==="OK") await processSquareToken(e.detail.token);
+     else alert("Cash App Pay was not completed.");
+   });
+ } catch(e){ cashappArea.innerHTML="<p class='small'>Cash App Pay is not currently available for this browser or account configuration.</p>"; }
+
+ try {
+   applePay=await payments.applePay(paymentRequest());
+ } catch(e){ applepayArea.innerHTML="<p class='small'>Apple Pay is not available on this device/browser or domain configuration.</p>"; }
+}
+function paymentRequest(){
+ return payments.paymentRequest({
+   countryCode:"US",currencyCode:"USD",
+   total:{amount:document.querySelector("#total").textContent,label:"PropBills Entertainment Props"}
+ });
+}
+async function processSquareToken(token){
+ const res=await fetch("/.netlify/functions/square-payment",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({token,order:orderData()})});
+ const data=await res.json();
+ if(!res.ok) return alert(data.error||"Payment failed.");
+ alert("Payment completed. Square payment ID: "+data.payment.id);
+}
+applePayButton.onclick=async()=>{
+ if(!validateOrder()) return;
+ if(!applePay) return alert("Apple Pay is not available.");
+ try {
+   const result=await applePay.tokenize();
+   if(result.status==="OK") await processSquareToken(result.token);
+   else alert("Apple Pay was not completed.");
+ } catch(e){ alert(e.message||"Apple Pay failed."); }
+};
+
+document.querySelectorAll(".pay").forEach(el=>el.onclick=async()=>{
+ selectedMethod=el.dataset.method;
+ document.querySelectorAll(".pay").forEach(x=>x.classList.remove("selected"));
+ el.classList.add("selected");
+ document.querySelectorAll(".payment-area").forEach(x=>x.style.display="none");
+ document.querySelector("#"+selectedMethod+"Area").style.display="block";
+ if(selectedMethod==="paypal") renderPayPal();
+});
+
+let paypalRendered=false;
+function renderPayPal(){
+ if(paypalRendered) return;
+ if(PAYPAL_CLIENT_ID==="REPLACE_WITH_YOUR_PAYPAL_CLIENT_ID"){
+   paypalArea.innerHTML="<p class='small'>Add your PayPal Client ID to enable PayPal.</p>"; return;
+ }
+ const script=document.createElement("script");
+ script.src="https://www.paypal.com/sdk/js?client-id="+encodeURIComponent(PAYPAL_CLIENT_ID)+"&currency=USD";
+ script.onload=()=>{
+   paypal.Buttons({
+     createOrder: async ()=>{
+       if(!validateOrder()) throw new Error("Order information is incomplete.");
+       const r=await fetch("/.netlify/functions/paypal-create-order",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({order:orderData()})});
+       const d=await r.json(); if(!r.ok) throw new Error(d.error||"Could not create PayPal order."); return d.id;
+     },
+     onApprove: async data=>{
+       const r=await fetch("/.netlify/functions/paypal-capture-order",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({orderID:data.orderID})});
+       const d=await r.json(); if(!r.ok) throw new Error(d.error||"PayPal capture failed.");
+       alert("Payment completed. Order ID: "+d.id);
+     },
+     onError: err=>alert(err.message||"PayPal payment failed.")
+   }).render("#paypal-button-container");
+   paypalRendered=true;
+ };
+ document.head.appendChild(script);
+}
+initSquare();
+updateTotal();
+</script>
+</body>
+</html>
